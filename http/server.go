@@ -22,10 +22,14 @@ func (s *HTTPServer) StartServer() error {
 	router := mux.NewRouter()
 
 	router.Path("/tasks").Methods("POST").HandlerFunc(s.httpHandlers.HandlerCreateTask)
-	
+	router.Path("/tasks/{title}").Methods("GET").HandlerFunc(s.httpHandlers.HandlerGetTask)
+	router.Path("/tasks").Methods("GET").Queries("completed", "false").HandlerFunc(s.httpHandlers.HandlerGetAllUncompletedTasks)
+	router.Path("/tasks").Methods("GET").HandlerFunc(s.httpHandlers.HandlerGetAllTasks)
+	router.Path("/tasks/{title}").Methods("PATCH").HandlerFunc(s.httpHandlers.HandlerCompleteTask)
+	router.Path("/tasks/{title}").Methods("DELETE").HandlerFunc(s.httpHandlers.HandlerDeleteTask)
 
-	if err:= http.ListenAndServe(":9091", router); err != nil {
-		if errors.Is(err,http.ErrServerClosed) {
+	if err := http.ListenAndServe(":9091", router); err != nil {
+		if errors.Is(err, http.ErrServerClosed) {
 			return nil
 		} else {
 			return err

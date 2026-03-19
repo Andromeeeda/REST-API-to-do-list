@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/gorilla/mux"
 )
 
 // структура для работы с хенделерами
@@ -80,7 +82,6 @@ func (h *HTTPHandlers) HandlerCreateTask(w http.ResponseWriter, r *http.Request)
 	if _, err := w.Write(b); err != nil {
 		fmt.Println("failed to write http response: ", err)
 	}
-	
 
 }
 
@@ -102,6 +103,36 @@ response body: JSON with message error + time
 
 func (h *HTTPHandlers) HandlerGetTask(w http.ResponseWriter, r *http.Request) {
 
+	title := mux.Vars(r)["title"]
+
+	getTitle, err := h.toDoList.GetTask(title)
+	if err != nil {
+		errorDto := ErrorDTO{
+			Message: err.Error(),
+			Time:    time.Now(),
+		}
+
+		if errors.Is(err, todo.ErrTaskNotFound) {
+			http.Error(w, errorDto.ToString(), http.StatusNotFound)
+		} else {
+			http.Error(w, errorDto.ToString(), http.StatusInternalServerError)
+		}
+		return
+
+	}
+
+	b, err := json.MarshalIndent(getTitle, "", "    ")
+
+	if err != nil {
+		panic(err)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(b); err != nil {
+		fmt.Println("fail to write http response", err)
+		return
+	}
+
 }
 
 /*
@@ -121,10 +152,23 @@ response body: JSON with message error + time
 
 func (h *HTTPHandlers) HandlerGetAllTasks(w http.ResponseWriter, r *http.Request) {
 
+	allTasks := h.toDoList.AllTasks()
+
+	b, err := json.MarshalIndent(allTasks, "", "    ")
+	if err != nil {
+		panic(err)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(b); err != nil {
+		fmt.Println("fail to write http response")
+		return
+	}
+
 }
 
 /*
-pattern: /tasks?completed=true
+pattern: /tasks?completed=false
 method: GET
 info: query params
 
@@ -138,6 +182,19 @@ response body: JSON with message error + time
 */
 
 func (h *HTTPHandlers) HandlerGetAllUncompletedTasks(w http.ResponseWriter, r *http.Request) {
+
+	allUncompletedTasks := h.toDoList.ListUncompletedTask()
+
+	b, err := json.MarshalIndent(allUncompletedTasks, "", "    ")
+	if err != nil {
+		panic(err)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(b); err != nil {
+		fmt.Println("fail to write http response:", err)
+		return
+	}
 
 }
 
@@ -156,6 +213,43 @@ response body: JSON with message error + time
 */
 func (h *HTTPHandlers) HandlerCompleteTask(w http.ResponseWriter, r *http.Request) {
 
+	var completeDto CompleteDTO
+	if err := json.NewDecoder(r.Body).Decode(&completeDto); err != nil {
+		var errorDto = ErrorDTO{
+			Message: err.Error(),
+			Time:    time.Now(),
+		}
+
+		http.Error(w, errorDto.ToString(), http.StatusBadRequest)
+	}
+
+	title := mux.Vars(r)["title"]
+
+	completeTask, err := h.toDoList.CompletedTask(title)
+	if err != nil {
+		errorDto := ErrorDTO{
+			Message: err.Error(),
+			Time:    time.Now(),
+		}
+
+		if errors.Is(err, todo.ErrTaskNotFound) {
+			http.Error(w, errorDto.ToString(), 404)
+		} else {
+			http.Error(w, errorDto.ToString(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	b, err := json.MarshalIndent(completeTask, "", "    ")
+	if err != nil {
+		panic(err)
+	}
+
+	w.WriteHeader(http.StatusOK)
+	if _, err := w.Write(b); err != nil {
+		fmt.Println("fail to write http response:", err)
+		return
+	}
 }
 
 /*
@@ -165,12 +259,28 @@ info: pattern
 
 succced:
 status code: 204 No content
-response body: JSON represented delete task
+response body: -
 
 failed:
 status code: 400,404,500
 response body: JSON with message error + time
 */
 func (h *HTTPHandlers) HandlerDeleteTask(w http.ResponseWriter, r *http.Request) {
+	title := mux.Vars(r)["title"]
 
+	if err := h.toDoList.DeleteTask(title); err != nil {
+		errorDto := ErrorDTO{
+			Message: err.Error(),
+			Time:    time.Now(),
+		}
+
+		if errors.Is(err, todo.ErrTaskNotFound) {
+			http.Error(w, errorDto.ToString(), 404)
+		} else {
+			http.Error(w, errorDto.ToString(), http.StatusInternalServerError)
+		}
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

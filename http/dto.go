@@ -6,6 +6,10 @@ import (
 	"time"
 )
 
+type CompleteDTO struct {
+	Completed bool
+}
+
 type TaskDTO struct {
 	Title       string
 	Description string
